@@ -32,9 +32,11 @@ skills/figma-mcp-guardrails/
 ├─ references/
 │  ├─ rules.md                 구현 규칙 — 토큰, 이름, 반응형, 상태, 폼, 접근성, 체크리스트
 │  ├─ failure-cases.md         실수 8가지의 증상 · 원인 · 발견 경로 · 확인 날짜와 재확인 조건
-│  └─ adding-guardrails.md     G9 후보를 찾고 채택하는 절차
+│  ├─ adding-guardrails.md     G9 후보를 찾고 채택하는 절차
+│  └─ observations.md          보류한 패턴 — 아직 규칙이 아닌 것
 └─ scripts/
-   └─ check.mjs                Playwright 자동 점검
+   ├─ lint.mjs                 코드 검사 — G2 · G3 · G4 · !important. 훅으로 건다
+   └─ check.mjs                Playwright 화면 점검
 templates/
 └─ CLAUDE.nextjs.md            Next.js 프로젝트용 CLAUDE.md — 프로젝트별 결정만. 공통 규칙은 스킬을 참조
 ```
@@ -73,7 +75,63 @@ Figma 링크를 주고 화면을 만들어 달라고 하면 Claude 가 스킬을
 
 ---
 
-## 자동 점검 — `check.mjs`
+## 코드 검사 — `lint.mjs`
+
+브라우저 없이 파일만 읽는다. 의존성 없음 (Node 18+).
+
+| 규칙 | 잡는 것 |
+|---|---|
+| G2 | 소수점 px(`37.33px`), 토큰 파일 밖의 색 직접 사용(`#a2bde4`, `rgb(…)`) |
+| G3 | 정의 안 된 CSS 변수 — 프로젝트 전체에서 정의를 모아 대조. `var(--x, 기본값)` 은 제외 |
+| G4 | `preventDefault()` 직후 20줄 안의 `setTimeout` — 성공 흉내 의심. `_preview` 파일은 제외 |
+| `!important` | `[hidden]` 리셋 · `prefers-reduced-motion` 블록 밖 |
+
+```bash
+node .claude/skills/figma-mcp-guardrails/scripts/lint.mjs            # 전체
+node .claude/skills/figma-mcp-guardrails/scripts/lint.mjs src/styles # 일부
+```
+
+```
+components/card.css:2  G2         소수점 px 37.33px — 가까운 토큰으로
+components/card.css:2  G3         정의 안 된 변수 --shadow-1 — 오류 없이 무시된다
+components/form.js:5   G4         전송을 막은 뒤 setTimeout — 성공 흉내가 아닌지 확인
+
+3건 — G2 1 · G3 1 · G4 1
+```
+
+| 옵션 | |
+|---|---|
+| `--only G3,G4` | 일부 규칙만 — 기존 코드베이스에 처음 걸 때 G2 는 양이 많다 |
+| `--tokens <글자>` | 토큰·리셋 파일로 볼 파일명 (기본 `tokens` `reset` `globals` `base`) |
+| `--skip <글자>` | 경로에 이 글자가 든 파일 제외 |
+
+의도한 줄은 그 줄 주석에 `guardrails-ignore` 와 이유를 적는다.
+
+### 훅으로 걸기
+
+`.claude/settings.json` — Claude 가 파일을 고칠 때마다 그 파일을 검사하고, 걸리면 결과를 Claude 에게 돌려준다.
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          { "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR\"/.claude/skills/figma-mcp-guardrails/scripts/lint.mjs --hook --only G3,G4,!important" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+새 프로젝트면 `--only` 를 빼고 전부 건다.
+
+---
+
+## 화면 점검 — `check.mjs`
 
 375 · 768 · 1366 · 1920 네 폭에서 페이지를 연다.
 
@@ -110,6 +168,11 @@ node .claude/skills/figma-mcp-guardrails/scripts/check.mjs http://localhost:3000
 | `--no-shot` | 스크린샷 생략 |
 | `--only 375,1366` | 일부 폭만 |
 | `--channel chrome` | 설치된 Chrome 사용 |
+| `--ignore <글자>` | 주소에 이 글자가 든 요청·콘솔 오류 무시. 여러 번 (외부 태그·폰트 등) |
+
+- `ERR_ABORTED`(페이지 이동·미리 불러오기 취소)는 실패로 세지 않는다
+- 입력 16px 검사는 **지금 숨은 칸도 본다** — 닫힌 시트·모달 안 폼이 열리면 그대로 확대된다.
+  포커스를 받을 수 없는 칸(비활성, `inert`·`aria-hidden` 안, `tabindex=-1`)만 뺀다
 
 > **한계** — iOS Safari 의 입력 확대·주소창 높이 변화는 재현하지 못한다.
 > 16px 검사는 원인을 정적으로 찾을 뿐이다. 폼 화면은 실제 아이폰에서 한 번 본다.

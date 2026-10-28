@@ -56,8 +56,11 @@ public/fonts/          woff2 → next/font/local
 ## 4. 넘기기 전
 
 ```bash
-node .claude/skills/figma-mcp-guardrails/scripts/check.mjs http://localhost:3000 {/ /signup}
+node .claude/skills/figma-mcp-guardrails/scripts/lint.mjs --tokens tokens --tokens globals
+node .claude/skills/figma-mcp-guardrails/scripts/check.mjs http://localhost:3000 {/ /signup} {--ignore 외부도메인}
 npm run build
 ```
+
+`lint.mjs` 는 `.claude/settings.json` 훅으로도 건다 — README "훅으로 걸기".
 
 체크리스트는 `rules.md` 10절.

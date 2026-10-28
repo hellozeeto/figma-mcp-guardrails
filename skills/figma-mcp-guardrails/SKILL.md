@@ -10,7 +10,8 @@ Figma MCP 가 주는 코드는 **디자인의 표현**이지 완성 코드가 �
 
 - 구현 규칙 상세 → `references/rules.md`
 - 실수 유형과 근거 → `references/failure-cases.md`
-- 자동 점검 → `scripts/check.mjs`
+- 코드 검사 → `scripts/lint.mjs` (G2 · G3 · G4 · `!important`) — 훅으로 걸면 쓰는 순간 잡는다
+- 화면 점검 → `scripts/check.mjs` (가로 넘침 · 콘솔 · 깨진 리소스 · G7)
 
 ---
 
@@ -88,6 +89,8 @@ Figma MCP 가 주는 코드는 **디자인의 표현**이지 완성 코드가 �
 
 ### 6. 검증
 
+0. **코드 검사** — `scripts/lint.mjs`. 훅이 걸려 있으면 이미 돌았다. 걸린 줄은 고치거나,
+   의도한 것이면 그 줄에 `guardrails-ignore` 와 이유를 적는다
 1. **자동 점검** — `scripts/check.mjs` 로 4개 폭(375 / 768 / 1366 / 1920)을 돈다
    가로 넘침 · 콘솔 오류 · 깨진 이미지·리소스 · 터치 화면 16px 미만 입력 칸 · 스크린샷
 2. **시안 대조** — 4단계 스크린샷과 1번 스크린샷을 나란히 놓고 간격·크기·정렬을 본다

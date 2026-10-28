@@ -19,6 +19,8 @@
  *   --no-shot        스크린샷을 찍지 않는다
  *   --only <폭,…>    일부 폭만 (예: --only 375,1366)
  *   --channel <이름>  설치된 브라우저를 쓴다 (예: chrome)
+ *   --ignore <글자>   주소에 이 글자가 들어간 요청·콘솔 오류는 무시한다. 여러 번 줄 수 있다
+ *                    (예: --ignore googletagmanager --ignore fonts.gstatic)
  *
  * 문제가 하나라도 있으면 종료 코드 1 — CI 에 그대로 걸 수 있다.
  *
@@ -42,18 +44,19 @@ const NON_TEXT = ['hidden', 'checkbox', 'radio', 'submit', 'button', 'reset',
                   'file', 'range', 'color', 'image'];
 
 function parseArgs(argv) {
-  const opt = { base: null, paths: [], out: 'check-shots', shot: true, only: null, channel: undefined };
+  const opt = { base: null, paths: [], out: 'check-shots', shot: true, only: null, channel: undefined, ignore: [] };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--out') opt.out = argv[++i];
     else if (a === '--no-shot') opt.shot = false;
     else if (a === '--only') opt.only = argv[++i].split(',');
     else if (a === '--channel') opt.channel = argv[++i];
+    else if (a === '--ignore') opt.ignore.push(argv[++i]);
     else if (!opt.base) opt.base = a;
     else opt.paths.push(a);
   }
   if (!opt.base) {
-    console.error('usage: node check.mjs <base-url> [path ...] [--out dir] [--no-shot] [--only 375,1366] [--channel chrome]');
+    console.error('usage: node check.mjs <base-url> [path ...] [--out dir] [--no-shot] [--only 375,1366] [--channel chrome] [--ignore 글자]');
     process.exit(2);
   }
   if (opt.paths.length === 0) opt.paths = ['/'];
@@ -98,11 +101,24 @@ function inspect({ touch, nonText }) {
     };
   }
 
+  /* 지금 숨어 있는 칸도 본다 — 닫힌 시트·모달 안의 폼이 열리면 그대로 확대된다.
+     실제로 문제가 난 칸이 처음엔 닫혀 있는 하단 시트 안에 있었다.
+     빼는 것은 **포커스를 받을 수 없는 칸**뿐이다 (비활성, inert·aria-hidden 안,
+     tabindex=-1 — 직접 그린 드롭다운 뒤에 숨긴 원래 select 같은 것) */
+  const unfocusable = (el) =>
+    el.disabled ||
+    el.closest('[inert], [aria-hidden="true"]') !== null ||
+    el.getAttribute('tabindex') === '-1';
+  const shown = (el) => el.getClientRects().length > 0 && getComputedStyle(el).visibility !== 'hidden';
+
   if (touch) {
     for (const el of document.querySelectorAll('input, select, textarea')) {
       if (el.tagName === 'INPUT' && nonText.includes((el.type || 'text').toLowerCase())) continue;
+      if (unfocusable(el)) continue;
       const fs = parseFloat(getComputedStyle(el).fontSize);
-      if (fs < 16) out.smallInputs.push(`${label(el)}${el.name ? `[name=${el.name}]` : ''} ${fs}px`);
+      if (fs < 16) {
+        out.smallInputs.push(`${label(el)}${el.name ? `[name=${el.name}]` : ''} ${fs}px${shown(el) ? '' : ' (지금은 숨김)'}`);
+      }
     }
   }
 
@@ -138,10 +154,25 @@ async function checkPage(browser, vp, url, opt) {
   const page = await ctx.newPage();
   const issues = [];
 
-  page.on('console', (m) => { if (m.type() === 'error') issues.push(`console  ${m.text()}`); });
+  const ignored = (url) => !!url && opt.ignore.some((s) => url.includes(s));
+
+  page.on('console', (m) => {
+    if (m.type() !== 'error' || ignored(m.location()?.url)) return;
+    /* 리소스 실패는 아래 response · requestfailed 가 주소와 함께 잡는다. 두 번 세지 않는다 */
+    if (m.text().startsWith('Failed to load resource')) return;
+    issues.push(`console  ${m.text()}`);
+  });
   page.on('pageerror', (e) => issues.push(`예외     ${e.message}`));
-  page.on('requestfailed', (r) => issues.push(`요청실패 ${r.url()} (${r.failure()?.errorText})`));
-  page.on('response', (r) => { if (r.status() >= 400) issues.push(`HTTP ${r.status()} ${r.url()}`); });
+  page.on('requestfailed', (r) => {
+    const err = r.failure()?.errorText || '';
+    /* ERR_ABORTED 는 실패가 아니라 취소다 — 페이지 이동, 미리 불러오기 취소,
+       동영상 범위 요청 끊기. 그대로 두면 정상 페이지가 매번 빨갛게 나온다 */
+    if (/ERR_ABORTED|NS_BINDING_ABORTED/.test(err) || ignored(r.url())) return;
+    issues.push(`요청실패 ${r.url()} (${err})`);
+  });
+  page.on('response', (r) => {
+    if (r.status() >= 400 && !ignored(r.url())) issues.push(`HTTP ${r.status()} ${r.url()}`);
+  });
 
   try {
     await page.goto(url, { waitUntil: 'load', timeout: 45000 });
@@ -159,7 +190,7 @@ async function checkPage(browser, vp, url, opt) {
     for (const c of r.overflow.culprits) issues.push(`           ↳ ${c}`);
   }
   for (const s of r.smallInputs) issues.push(`입력<16px ${s}`);
-  for (const s of r.brokenImages) issues.push(`깨진이미지 ${s}`);
+  for (const s of r.brokenImages) if (!ignored(s)) issues.push(`깨진이미지 ${s}`);
 
   if (opt.shot) {
     const slug = new URL(url).pathname.replace(/^\/|\/$/g, '').replace(/[^\w-]+/g, '_') || 'index';

@@ -32,6 +32,7 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;   /* 없으면 무한 반복이 0.01ms 로 계속 깜빡인다 */
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
   }
@@ -192,6 +193,7 @@ firstInvalid.focus();
 - [ ] 성공 흉내 코드 없음 — 연결 자리는 `TODO(api)` (G4)
 - [ ] 오류 자리가 처음부터 마크업에 있고 `aria-describedby` 로 이어져 있다 (G5)
 - [ ] 요청 범위 밖 기능 없음 (G6)
+- [ ] `scripts/lint.mjs` 통과 — 소수점 px·색 직접 사용(G2), 정의 안 된 변수(G3), 성공 흉내(G4), `!important`
 - [ ] `scripts/check.mjs` 통과 — 가로 넘침·콘솔 오류·깨진 리소스·입력 16px (G7)
 - [ ] 시안과 다르게 한 곳 / 시안·스펙 충돌 / 새로 만든 상태 — 표 세 개 (G8)
 - [ ] 폼이 있는 화면은 실제 아이폰에서 한 번 눌러 봤다
