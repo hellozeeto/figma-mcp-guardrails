@@ -31,11 +31,12 @@ skills/figma-mcp-guardrails/
 ├─ SKILL.md                    가드레일 8개 + 작업 순서 (프레임 확정 → 토큰 → 노드 → 구현 → 검증 → 보고)
 ├─ references/
 │  ├─ rules.md                 구현 규칙 — 토큰, 이름, 반응형, 상태, 폼, 접근성, 체크리스트
-│  └─ failure-cases.md         실수 8가지의 증상 · 원인 · 발견 경로
+│  ├─ failure-cases.md         실수 8가지의 증상 · 원인 · 발견 경로 · 확인 날짜와 재확인 조건
+│  └─ adding-guardrails.md     G9 후보를 찾고 채택하는 절차
 └─ scripts/
    └─ check.mjs                Playwright 자동 점검
 templates/
-└─ CLAUDE.nextjs.md            Next.js 프로젝트용 CLAUDE.md 뼈대
+└─ CLAUDE.nextjs.md            Next.js 프로젝트용 CLAUDE.md — 프로젝트별 결정만. 공통 규칙은 스킬을 참조
 ```
 
 ---
@@ -112,6 +113,19 @@ node .claude/skills/figma-mcp-guardrails/scripts/check.mjs http://localhost:3000
 
 > **한계** — iOS Safari 의 입력 확대·주소창 높이 변화는 재현하지 못한다.
 > 16px 검사는 원인을 정적으로 찾을 뿐이다. 폼 화면은 실제 아이폰에서 한 번 본다.
+
+---
+
+## 규칙 늘리기 · 지우기
+
+G1~G8 은 끝이 아니다. 퍼블리싱 묶음이 끝나면 PR 리뷰 · QA 피드백 · 세션 기록을 모아
+**G1~G8 로 설명되지 않는 패턴**을 AI 에게 찾게 하고, 근거와 발생 횟수가 붙은 후보를 사람이 고른다.
+채택하면 커밋 — git 이력이 규칙의 버전 기록이 된다.
+
+환경에 기대는 규칙(G7 아이폰 확대 등)은 언젠가 낡는다. `failure-cases.md` 각 항목의
+**확인** 줄(날짜 · 환경 · 재확인 조건)이 지워도 되는지 판단할 근거다.
+
+절차 → [`references/adding-guardrails.md`](skills/figma-mcp-guardrails/references/adding-guardrails.md)
 
 ---
 

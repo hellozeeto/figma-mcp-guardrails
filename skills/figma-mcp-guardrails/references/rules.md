@@ -10,7 +10,7 @@
 |---|---|
 | Figma 자동 생성 이름 (`Frame577`, `group-504`, `rectangle-369`) | 유지보수 불가. **역할로** 이름 짓는다 (`.product-card` ○ / `.right-box` ✗ / `.blue-card` ✗) |
 | 인라인 스타일 | 값을 찾을 수 없다. 동적 값은 **CSS 변수로만** 넘긴다 (아래 예외) |
-| `!important` | 캐스케이드를 망친다. 구조로 해결한다. 단 `prefers-reduced-motion` 오버라이드는 예외 |
+| `!important` | 캐스케이드를 망친다. 구조로 해결한다. **예외 두 곳만** — 아래 |
 | 색·간격 숫자를 컴포넌트에 직접 | 전부 토큰으로 |
 | 외부 CDN 폰트·스크립트 | 배포 환경 장애에 그대로 노출된다. 파일로 들고 있는다 |
 | 성공 흉내 (`setTimeout` 완료) | → failure-cases 4 |
@@ -19,6 +19,23 @@
 
 ```html
 <span class="product-card__swatch" style="--swatch: #3DDC84"></span>
+```
+
+`!important` 예외 — 리셋 파일에만 둔다. 컴포넌트 파일에는 쓰지 않는다:
+
+```css
+/* hidden 속성은 브라우저 기본 display:none 이라 컴포넌트의 display:flex 같은
+   한 줄에 진다. 그러면 hidden 을 붙여도 보인다 — 오류 문구·빈 상태가 늘 떠 있게 된다 */
+[hidden] { display: none !important; }
+
+/* 움직임을 줄여 달라고 한 사람. 컴포넌트마다 특정도를 이길 방법이 이것뿐이다 */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
 ```
 
 ---
@@ -102,17 +119,38 @@ CSS Modules 면 `.card` `.title` `.compact` `.isActive` 처럼 같은 구분을 
 ## 7. 폼
 
 ```html
-<div class="field">
-  <label class="field__label" for="f-name">Name <span class="field__req">*</span></label>
-  <input class="field__input" id="f-name" name="name" required>
-  <p class="field__error" hidden>Please enter your name</p>
-</div>
+<form class="form" novalidate>
+  <!-- 폼 전체 알림. 늘 그려 두고 비워 둔다 -->
+  <p class="form__status" role="status" aria-live="polite"></p>
+
+  <div class="field">
+    <label class="field__label" for="f-name">Name <span class="field__req" aria-hidden="true">*</span></label>
+    <input class="field__input" id="f-name" name="name" required
+           aria-describedby="f-name-error">
+    <p class="field__error" id="f-name-error" hidden>Please enter your name</p>
+  </div>
+</form>
+```
+
+```js
+/* 칸마다 */  input.setAttribute('aria-invalid', 'true');  error.hidden = false;
+/* 해제    */  input.removeAttribute('aria-invalid');       error.hidden = true;
+
+/* 막혔을 때 — 전체 알림을 쓰고, 첫 오류 칸으로 포커스 */
+status.textContent = 'Please fix 2 fields.';
+firstInvalid.focus();
 ```
 
 - `name` = 기능정의서 필드명
 - 모든 입력에 `label` + `for`
-- 필수 = `*` 표시 + `required`
-- **오류 자리는 처음부터, `hidden` 으로** — 클라이언트·서버 검증이 같은 자리를 쓴다
+- 필수 = `*` 표시 + `required`. `*` 는 `aria-hidden` — `required` 가 이미 "필수" 를 읽어 준다
+- **오류 자리는 처음부터 마크업에 둔다** — 클라이언트·서버 검증이 같은 자리를 쓴다 (G5)
+- 칸별 오류는 `aria-describedby` 로 잇고 오류일 때 `aria-invalid="true"`.
+  포커스가 그 칸에 가면 라벨 → "invalid" → 오류 문구 순으로 읽힌다
+- `aria-live` 는 **폼 전체 알림 한 곳에만** 둔다. 칸마다 걸면 오류 여러 개가 한꺼번에 겹쳐 읽힌다
+- live 영역은 **늘 그려 두고 글자만 바꾼다.** `hidden` · `display:none` 상태에서 글자와 함께
+  나타나면 화면낭독기가 놓치는 경우가 있다
+- 전송이 막히면 첫 번째 오류 칸으로 포커스를 옮긴다
 - 체크박스는 테두리를 줄 수 없다 → `outline` + 글자색
 - 버튼은 `<button type="submit">`
 - 입력 칸 글자는 `max(시안 크기, var(--fs-input-min))`
@@ -140,6 +178,7 @@ CSS Modules 면 `.card` `.title` `.compact` `.isActive` 처럼 같은 구분을 
 - 포커스 링 제거 금지 (`outline: none` ✗)
 - 모달 — 열릴 때 포커스 이동, `Esc` 로 닫힘, 포커스 가두기
 - 색만으로 정보를 전달하지 않는다 (오류 = 색 + 문구)
+- 오류·상태 변화는 화면낭독기에도 전달한다 — 7절의 `aria-describedby` · `aria-invalid` · `role="status"`
 - `prefers-reduced-motion` 이면 애니메이션 즉시
 
 ---
@@ -151,7 +190,7 @@ CSS Modules 면 `.card` `.title` `.compact` `.isActive` 처럼 같은 구분을 
 - [ ] Figma 자동 생성 이름·소수점 px 없음 (G2)
 - [ ] 쓴 토큰이 전부 정의돼 있다 (G3)
 - [ ] 성공 흉내 코드 없음 — 연결 자리는 `TODO(api)` (G4)
-- [ ] 오류 자리가 처음부터 마크업에 있다 (G5)
+- [ ] 오류 자리가 처음부터 마크업에 있고 `aria-describedby` 로 이어져 있다 (G5)
 - [ ] 요청 범위 밖 기능 없음 (G6)
 - [ ] `scripts/check.mjs` 통과 — 가로 넘침·콘솔 오류·깨진 리소스·입력 16px (G7)
 - [ ] 시안과 다르게 한 곳 / 시안·스펙 충돌 / 새로 만든 상태 — 표 세 개 (G8)
